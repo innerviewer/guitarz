@@ -1,0 +1,2 @@
+[OPTIMIZATION] Make analyzer a dynamically allocated object with init 
+                and deinit functions to prevent constant recreating of Aubio objects.

@@ -2,14 +2,23 @@ const pa = @cImport({
     @cInclude("portaudio.h");
 });
 
-const fftw = @cImport({
-    @cInclude("fftw3.h");
-});
-
 const std = @import("std");
+const cli = @import("cli.zig");
+const analyzer = @import("analyzer.zig");
 
 pub fn main() !void {
-    // const allocator = std.heap.page_allocator;
+    std.debug.print("[INFO]: initializing GuitarZ.\n", .{});
+    if (!cli.parseArguments()) {
+        return;
+    }
+
+    if (cli.sample_rate != undefined) {
+        std.debug.print("[INFO]: user-chosen sample rate is: {d}.\n", .{cli.sample_rate});
+    }
+
+    //var preferred_device: u32 = undefined;
+    const sampleRates = [_]f64{ 8000, 16000, 32000, 44100, 48000, 96000 };
+    const bufferSize = 4196 * 4;
 
     if (pa.Pa_Initialize() != pa.paNoError) {
         std.debug.print("Failed to initialize PortAudio!\n", .{});
@@ -39,7 +48,6 @@ pub fn main() !void {
 
     var sampleRate: f64 = undefined;
 
-    const sampleRates = [_]f64{ 8000, 16000, 32000, 44100, 48000, 96000 };
     for (sampleRates) |rate| {
         const result = pa.Pa_IsFormatSupported(&inputParameters, null, rate);
         if (result == pa.paFormatIsSupported) {
@@ -55,14 +63,18 @@ pub fn main() !void {
         return;
     }
 
+    std.debug.print("Chosen sample rate is {d}.\n", .{sampleRate});
+
+    std.debug.print("Buffer size is {d}.\n\n", .{bufferSize});
+
     var stream: ?*pa.PaStream = null;
-    const streamInitError = pa.Pa_OpenStream(&stream, &inputParameters, null, sampleRate, 256, pa.paClipOff, null, null);
+    const streamInitError = pa.Pa_OpenStream(&stream, &inputParameters, null, sampleRate, bufferSize, pa.paClipOff, null, null);
     if (streamInitError != pa.paNoError) {
         std.debug.print("Failed to open stream: {s}\n", .{pa.Pa_GetErrorText(streamInitError)});
         return;
     }
 
-    var buffer: [256]f32 = undefined;
+    var buffer: [bufferSize]f32 = undefined;
 
     std.debug.print("Listening for audio input...\n", .{});
     const streamStartError = pa.Pa_StartStream(stream);
@@ -70,6 +82,8 @@ pub fn main() !void {
         std.debug.print("Failed to start stream: {s}\n", .{pa.Pa_GetErrorText(streamStartError)});
         return;
     }
+
+    std.debug.print("x1B[2J\x1B[H", .{});
 
     while (true) {
         const streamReadError = pa.Pa_ReadStream(stream, &buffer, buffer.len);
@@ -79,50 +93,16 @@ pub fn main() !void {
             break;
         }
 
-        // Calculate the frequency (for now, just a placeholder)
-        const frequency: f32 = calculateFrequency(buffer[0..]);
-        std.debug.print("Detected frequency: {d} Hz\n", .{frequency});
+        _ = analyzer.recognizeNote(buffer[0..], bufferSize, sampleRate);
+
+        //std.debug.print("\x1B[2J\x1B[HDetected note: {s}.\n", .{analyzer.recognizeNote(buffer[0..], bufferSize, sampleRate)});
+        //const frequency: f32 = calculateFrequency(buffer[0..], bufferSize, sampleRate);
+        //std.debug.print("{}", .{frequency});
+        //std.debug.print("\x1B[2J\x1B[HDetected frequency: {d} Hz\n", .{frequency});
+        //std.time.sleep(100_000_000);
     }
 
     _ = pa.Pa_StopStream(stream);
     _ = pa.Pa_CloseStream(stream);
     _ = pa.Pa_Terminate();
-}
-
-fn calculateFrequency(samples: []const f32) f32 {
-    const N: u16 = 256;
-    var input: [N]f64 = undefined;
-    var output: [N]f64 = undefined;
-
-    for (samples, 0..) |sample, i| {
-        input[i] = @floatCast(sample);
-    }
-
-    // Allocate FFTW resources
-    const plan = fftw.fftw_plan_r2r_1d(N, &input[0], &output[0], fftw.FFTW_R2HC, fftw.FFTW_ESTIMATE);
-    fftw.fftw_execute(plan);
-    fftw.fftw_destroy_plan(plan);
-
-    // Find the frequency with the maximum amplitude
-    var maxAmplitude: f64 = 0;
-    var dominantFrequency: f32 = 0;
-    const sampleRate: f32 = 44100.0;
-
-    for (0..N / 2) |i| {
-        const amplitude = output[i] * output[i];
-        if (amplitude > maxAmplitude) {
-            maxAmplitude = amplitude;
-            dominantFrequency = @floatFromInt(i);
-        }
-    }
-
-    // Calculate the frequency in Hz
-    return @floatCast((dominantFrequency * sampleRate) / N);
-}
-
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
 }
