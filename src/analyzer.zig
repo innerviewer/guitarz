@@ -53,16 +53,16 @@ fn findNoteIndex(comptime note: []const u8, comptime NOTE_NAMES: []const []const
 
 pub fn recognizeNote(input_buffer: []const f32, buffer_size: u16, sample_rate: f64) void { //*const [:0]u8 {
     const frequency: f32 = calculateFrequency(input_buffer, buffer_size, sample_rate);
-    _ = frequency;
+    std.debug.print("\x1B[2J\x1B[HDetected frequency: {d}.\n", .{frequency});
 
-    const notes = generateGuitarNotes();
+    // const notes = generateGuitarNotes();
 
-    for (notes, 0..) |string, string_index| {
-        std.debug.print("String {d}:\n", .{string_index + 1});
-        for (string) |note| {
-            std.debug.print("  {s}: {d} Hz\n", .{ note.name, note.frequency });
-        }
-    }
+    // for (notes, 0..) |string, string_index| {
+    //     std.debug.print("String {d}:\n", .{string_index + 1});
+    //     for (string) |note| {
+    //         std.debug.print("  {s}: {d} Hz\n", .{ note.name, note.frequency });
+    //     }
+    // }
 }
 
 pub fn calculateFrequency(input_buffer: []const f32, buffer_size: u16, sample_rate: f64) f32 {
