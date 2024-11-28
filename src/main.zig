@@ -13,7 +13,7 @@ pub fn main() !void {
     }
 
     if (cli.sample_rate != null) {
-        std.debug.print("[INFO]: user-chosen sample rate is: {d}.\n", .{cli.sample_rate});
+        std.debug.print("[INFO]: user-chosen sample rate is: {any}.\n", .{cli.sample_rate});
     }
 
     //var preferred_device: u32 = undefined;

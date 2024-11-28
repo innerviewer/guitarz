@@ -147,9 +147,9 @@ pub fn recognizeNote(input_buffer: []const f32, buffer_size: u16, sample_rate: f
     const closest_note = findClosestNoteByFrequency(frequency);
 
     if (closest_note) |note| {
-        std.debug.print("Closest note: {s} at {f} Hz\n", .{ note.name, note.frequency });
+        std.debug.print("Closest note: {s} at {d} Hz\n", .{ note.name, note.frequency });
     } else {
-        std.debug.print("No close match found for frequency {f} Hz\n", .{frequency});
+        std.debug.print("No close match found for frequency {d} Hz\n", .{frequency});
     }
 
     // std.debug.print("\x1B[2J\x1B[HDetected frequency: {d}.\n", .{frequency});
