@@ -4,9 +4,19 @@ const c = @cImport({
     @cInclude("aubio/aubio.h");
 });
 
-const Note = struct { name: []const u8, frequency: f32 };
+const NS_STRINGS = 6;
+const NB_FRETS = 24;
 
-fn generateGuitarNotes() [6][25]Note {
+const Note = struct {
+    name: []const u8,
+    frequency: f32,
+
+    pub fn lessThan(_: Note, lhs: Note, rhs: Note) bool {
+        comptime return (lhs.frequency < rhs.frequency);
+    }
+};
+
+pub fn generateGuitarNotes() []Note {
     const NOTE_NAMES = [_][]const u8{
         "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
     };
@@ -20,27 +30,66 @@ fn generateGuitarNotes() [6][25]Note {
         .{ .name = "E", .frequency = 329.63 },
     };
 
-    const NUM_FRETS = 24;
-    var notes: [6][25]Note = undefined;
+    var notes: [BASE_NOTES.len * (NB_FRETS + 1)]Note = undefined;
 
-    inline for (BASE_NOTES, 0..) |base_note, string_index| {
+    var index: usize = 0;
+    const formula = 1.059218335; // 2.0 ** 1.0/12.0
+    inline for (BASE_NOTES) |base_note| {
         var current_frequency = base_note.frequency;
         var current_note_index = findNoteIndex(base_note.name, &NOTE_NAMES);
 
-        inline for (0..NUM_FRETS + 1) |fret| {
-            notes[string_index][fret] = .{
+        inline for (0..NB_FRETS + 1) |_| {
+            notes[index] = .{
                 .name = NOTE_NAMES[current_note_index],
                 .frequency = current_frequency,
             };
 
-            // Move to the next semitone
-            current_note_index = (current_note_index + 1) % 12;
-            current_frequency *= std.math.pow(f32, 2.0, 1.0 / 12.0); // Frequency formula
+            current_note_index = (current_note_index + 1) % NOTE_NAMES.len;
+            current_frequency *= formula; // Frequency formula
+            //current_frequency *= std.math.pow(f32, 2.0, 1.0 / 12.0); // Frequency formula
+            index += 1;
         }
     }
 
-    return notes;
+    return &notes;
 }
+
+// !! CURRENTLY UNUSED, RESULTS IN A 2D ARRAY STRING->NOTES !!
+// fn generateGuitarNotes() [6][25]Note {
+//     const NOTE_NAMES = [_][]const u8{
+//         "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+//     };
+
+//     const BASE_NOTES = [_]Note{
+//         .{ .name = "E", .frequency = 82.41 },
+//         .{ .name = "A", .frequency = 110.00 },
+//         .{ .name = "D", .frequency = 146.83 },
+//         .{ .name = "G", .frequency = 196.00 },
+//         .{ .name = "B", .frequency = 246.94 },
+//         .{ .name = "E", .frequency = 329.63 },
+//     };
+
+//     const NUM_FRETS = 24;
+//     var notes: [NS_STRINGS][NB_FRETS]Note = undefined;
+
+//     inline for (BASE_NOTES, 0..) |base_note, string_index| {
+//         var current_frequency = base_note.frequency;
+//         var current_note_index = findNoteIndex(base_note.name, &NOTE_NAMES);
+
+//         inline for (0..NUM_FRETS + 1) |fret| {
+//             notes[string_index][fret] = .{
+//                 .name = NOTE_NAMES[current_note_index],
+//                 .frequency = current_frequency,
+//             };
+
+//             // Move to the next semitone
+//             current_note_index = (current_note_index + 1) % 12;
+//             current_frequency *= std.math.pow(f32, 2.0, 1.0 / 12.0); // Frequency formula
+//         }
+//     }
+
+//     return notes;
+// }
 
 fn findNoteIndex(comptime note: []const u8, comptime NOTE_NAMES: []const []const u8) u8 {
     inline for (NOTE_NAMES, 0..) |name, i| {
@@ -51,13 +100,61 @@ fn findNoteIndex(comptime note: []const u8, comptime NOTE_NAMES: []const []const
     @panic("Invalid note name");
 }
 
+// Sorting function
+fn sortNotesByFrequency(notes: []Note) []const Note {
+    @setEvalBranchQuota(10000);
+    // const len = notes.len;
+    // for (1..len) |i| {
+    //     var j = i;
+    //     const current = notes[i];
+    //     // Move elements of notes[0..i-1] that are greater than current
+    //     while (j > 0 and Note.lessThan(current, notes[j - 1])) {
+    //         notes[j] = notes[j - 1]; // Shift element to the right
+    //         j -= 1;
+    //     }
+    //     notes[j] = current; // Insert the current element at the correct position
+    // }
+
+    comptime std.mem.sort(Note, notes, Note{ .name = "", .frequency = 0.0 }, Note.lessThan);
+
+    return notes;
+}
+
+// Binary search for note recognition
+fn findClosestNoteByFrequency(target_frequency: f32) ?Note {
+    const sorted_notes = comptime sortNotesByFrequency(generateGuitarNotes());
+    var low: usize = 0;
+    var high: usize = sorted_notes.len - 1;
+
+    while (low <= high) {
+        const mid = (low + high) / 2;
+        const mid_note = sorted_notes[mid];
+
+        if (@abs(mid_note.frequency - target_frequency) < 1e-2) {
+            return mid_note; // Found a close enough match
+        } else if (mid_note.frequency < target_frequency) {
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    return null; // No match found
+}
+
 pub fn recognizeNote(input_buffer: []const f32, buffer_size: u16, sample_rate: f64) void { //*const [:0]u8 {
     const frequency: f32 = calculateFrequency(input_buffer, buffer_size, sample_rate);
-    std.debug.print("\x1B[2J\x1B[HDetected frequency: {d}.\n", .{frequency});
 
-    // const notes = generateGuitarNotes();
+    const closest_note = findClosestNoteByFrequency(frequency);
 
-    // for (notes, 0..) |string, string_index| {
+    if (closest_note) |note| {
+        std.debug.print("Closest note: {s} at {f} Hz\n", .{ note.name, note.frequency });
+    } else {
+        std.debug.print("No close match found for frequency {f} Hz\n", .{frequency});
+    }
+
+    // std.debug.print("\x1B[2J\x1B[HDetected frequency: {d}.\n", .{frequency});
+
+    // for (NOTES, 0..) |string, string_index| {
     //     std.debug.print("String {d}:\n", .{string_index + 1});
     //     for (string) |note| {
     //         std.debug.print("  {s}: {d} Hz\n", .{ note.name, note.frequency });

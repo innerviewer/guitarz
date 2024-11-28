@@ -24,8 +24,8 @@
     // internet connectivity.
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.9.1.tar.gz",
-            .hash = "122062d301a203d003547b414237229b09a7980095061697349f8bef41be9c30266b",
+            .url = "git+https://github.com/Hejsil/zig-clap#560c8dd72ab25d556123846254040c5bf9ad3ba4",
+            .hash = "12200abadc141099ff2ba5098f7eca9bf84d548dd92ec5827ef323d813d59b049780",
         },
     },
     .paths = .{

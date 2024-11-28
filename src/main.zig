@@ -12,7 +12,7 @@ pub fn main() !void {
         return;
     }
 
-    if (cli.sample_rate != undefined) {
+    if (cli.sample_rate != null) {
         std.debug.print("[INFO]: user-chosen sample rate is: {d}.\n", .{cli.sample_rate});
     }
 
@@ -46,22 +46,18 @@ pub fn main() !void {
         .hostApiSpecificStreamInfo = null,
     };
 
-    var sampleRate: f64 = undefined;
-
-    for (sampleRates) |rate| {
+    const sampleRate: f64 = for (sampleRates) |rate| {
         const result = pa.Pa_IsFormatSupported(&inputParameters, null, rate);
         if (result == pa.paFormatIsSupported) {
             std.debug.print("Sample rate {d} Hz is supported\n", .{rate});
-            sampleRate = rate;
+            break rate;
         } else {
             std.debug.print("Sample rate {d} Hz is NOT supported\n", .{rate});
         }
-    }
-
-    if (sampleRate == undefined) {
+    } else {
         std.debug.print("No supported sample rates found!\n", .{});
         return;
-    }
+    };
 
     std.debug.print("Chosen sample rate is {d}.\n", .{sampleRate});
 

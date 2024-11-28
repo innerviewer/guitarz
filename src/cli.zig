@@ -3,8 +3,8 @@ const clap = @import("clap");
 
 const VERSION = "0.0.1";
 
-pub var sample_rate: usize = undefined;
-pub var buffer_size: usize = undefined;
+pub var sample_rate: ?usize = null;
+pub var buffer_size: ?usize = null;
 
 pub fn parseArguments() bool {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
